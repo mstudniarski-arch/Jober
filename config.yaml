@@ -1,0 +1,27 @@
+# Hidden Job Scout — konfiguracja
+# Role do wyszukiwania — dopisz/zmień dowolną, bez zmian w kodzie.
+roles:
+  - SDET
+  - QA engineer
+  - tester
+  - test engineer
+  - test automation engineer
+  - test developer
+  - test lead
+  - test manager
+  - AI tester
+  - AI test engineer
+  - AI SDET
+
+# Limit wyszukiwań web na jeden przebieg (koszt ~$10/1000 wyszukiwań + tokeny)
+max_web_searches: 20
+
+model: claude-opus-4-8
+max_tokens: 32000
+
+# Oferty starsze niż tyle dni są pomijane
+recency_days: 30
+
+reports_dir: reports
+seen_file: data/seen.json
+logs_dir: logs
