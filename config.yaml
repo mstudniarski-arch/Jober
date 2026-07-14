@@ -16,8 +16,8 @@ roles:
 model: gemini-3.5-flash
 max_tokens: 32000
 
-# Oferty starsze niż tyle dni są pomijane
-recency_days: 30
+# Oferty starsze niż tyle godzin są pomijane (świeżość!)
+recency_hours: 24
 
 reports_dir: reports
 seen_file: data/seen.json

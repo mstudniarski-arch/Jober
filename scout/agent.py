@@ -23,8 +23,16 @@ QA/test engineers — then check their careers page.
 5. Classic job postings as a supplement — only with a direct application link.
 
 Constraints:
-- Fully remote positions only (worldwide or broad-region remote). Skip onsite/hybrid.
-- Only opportunities that appear posted or active within the last {recency_days} days.
+- Fully remote positions only. Skip onsite/hybrid. EXCLUDE offers restricted to US-based
+candidates ("US only", "must be authorized to work in the US", US-timezone-only). Offers open
+worldwide or to broad regions (EU, EMEA, APAC, LATAM) are in scope. Include offers from
+China-based companies when the posting is in English.
+- FRESHNESS IS CRITICAL: include ONLY offers published within the last {recency_hours} hours.
+Check the posting date on the page; if you cannot confirm it is within that window, skip it.
+Newest offers matter most.
+- For each finding, set "published_at" to the publication time in ISO 8601 UTC
+(e.g. "2026-07-14T09:00:00Z"); estimate it from "posted X hours ago" when needed;
+null only if truly unknown.
 - Prefer primary sources (the company's own page, the original LinkedIn post) over aggregators.
 - Do not invent anything. Every finding must come from a page you actually found via search. \
 If salary is not stated, use null.
@@ -41,7 +49,8 @@ After your research, end your reply with EXACTLY ONE fenced code block labeled j
     "apply_url": "direct URL to apply or make contact",
     "signal_type": "job_posting | linkedin_post | career_page | funding_news | recruiter_post",
     "source_url": "URL where you found the signal",
-    "location": "remote scope, e.g. 'Remote (worldwide)' or 'Remote (US only)'"
+    "location": "remote scope, e.g. 'Remote (worldwide)' or 'Remote (US only)'",
+    "published_at": "ISO 8601 UTC publication time, else null"
   }}
 ]}}
 ```
@@ -57,7 +66,7 @@ class ScanResult:
 
 def build_prompt(config: ScoutConfig) -> str:
     roles = "\n".join(f"- {role}" for role in config.roles)
-    return _PROMPT.format(roles=roles, recency_days=config.recency_days)
+    return _PROMPT.format(roles=roles, recency_hours=config.recency_hours)
 
 
 def _count_search_queries(response) -> int:

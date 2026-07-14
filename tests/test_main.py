@@ -61,3 +61,13 @@ def test_unparseable_answer_writes_raw_fallback(tmp_path):
     raw = tmp_path / "reports" / "2026-07-12-raw.md"
     assert raw.read_text(encoding="utf-8") == "no json here, sorry"
     assert not (tmp_path / "reports" / "2026-07-12.md").exists()
+
+
+def test_second_run_same_day_does_not_overwrite_report(tmp_path):
+    cfg = write_config(tmp_path)
+    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D)
+    first = (tmp_path / "reports" / "2026-07-12.md").read_text(encoding="utf-8")
+    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D)
+    assert (tmp_path / "reports" / "2026-07-12.md").read_text(encoding="utf-8") == first
+    assert len(list((tmp_path / "reports").glob("*.md"))) == 2
+

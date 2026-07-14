@@ -4,6 +4,9 @@ Agent AI, który **raz dziennie** przeszukuje internet i wypisuje do repozytoriu
 raport ze **zdalnymi ofertami pracy z całego świata** oraz sygnałami tzw.
 **ukrytego rynku pracy** (oferty nigdy niepublikowane na portalach) dla ról
 QA / SDET / tester — w tym **AI tester, AI test engineer, AI SDET**.
+Do raportu trafiają tylko oferty opublikowane w ciągu ostatnich **24 godzin**,
+bez ofert wyłącznie dla kandydatów z USA (oferty z Chin są uwzględniane, gdy
+ogłoszenie jest po angielsku), posortowane **od najnowszych**.
 
 Wyszukiwanie wykonuje model **Gemini 3.5 Flash** przez **grounding w Google
 Search** (wbudowany w Gemini API) — nie potrzebujesz żadnego dodatkowego API do
@@ -40,10 +43,13 @@ szukania ani scrapera. Wystarczy klucz `GEMINI_API_KEY`.
 Jeden przebieg = jedno wywołanie API. Skrypt:
 
 1. czyta `config.yaml` (lista ról) i `data/seen.json` (historia),
-2. każe modelowi wyszukać aktualne (≤ 30 dni) zdalne oferty dla podanych ról,
+2. każe modelowi wyszukać zdalne oferty opublikowane w ciągu ostatnich **24 godzin**
+   dla podanych ról — bez ofert wyłącznie dla kandydatów z USA; oferty z Chin są
+   uwzględniane, gdy ogłoszenie jest po angielsku,
 3. odbiera listę znalezisk w formacie JSON,
 4. wyrzuca duplikaty względem poprzednich dni,
-5. renderuje raport `reports/RRRR-MM-DD.md`, pogrupowany po typie sygnału,
+5. renderuje raport `reports/RRRR-MM-DD.md`, posortowany **od najnowszych**
+   (pole „Opublikowano"),
 6. dopisuje nowe pozycje do `data/seen.json`.
 
 ---
@@ -56,21 +62,12 @@ danymi — realny przebieg wypełnia go tym, co znajdzie w sieci):
 ```markdown
 # Hidden Job Scout — raport 2026-07-12
 
-## Posty na LinkedIn
-
-### Testly — Test Automation Engineer
-
-- **Firma:** Testly
-- **Projekt:** CI/CD testing SaaS
-- **Rola:** Test Automation Engineer
-- **Zarobki:** —
-- **Lokalizacja:** Remote (EU)
-- **Link do aplikowania:** https://linkedin.com/posts/jane-doe-hiring
-
-## Strony karier firm
+Najświeższe zdalne oferty z całego świata, posortowane od najnowszych.
 
 ### Nimbus AI — AI SDET
 
+- **Opublikowano:** 2026-07-12 09:30 UTC
+- **Typ sygnału:** Strony karier firm
 - **Firma:** Nimbus AI
 - **Projekt:** LLM eval platform
 - **Rola:** AI SDET
@@ -79,15 +76,27 @@ danymi — realny przebieg wypełnia go tym, co znajdzie w sieci):
 - **Link do aplikowania:** https://nimbus.ai/careers/ai-sdet
 - **Źródło:** https://nimbus.ai/careers
 
+### Testly — Test Automation Engineer
+
+- **Opublikowano:** 2026-07-12 06:15 UTC
+- **Typ sygnału:** Posty na LinkedIn
+- **Firma:** Testly
+- **Projekt:** CI/CD testing SaaS
+- **Rola:** Test Automation Engineer
+- **Zarobki:** —
+- **Lokalizacja:** Remote (EU)
+- **Link do aplikowania:** https://linkedin.com/posts/jane-doe-hiring
+
 ---
 *Wyszukiwań web: 18 · Nowe znaleziska: 2 · Odfiltrowane duplikaty: 4*
 ```
 
-Każde znalezisko ma pola: **Firma**, **Projekt** (czym firma/zespół się zajmuje),
-**Rola**, **Zarobki** (jeśli podane, inaczej `—`), **Lokalizacja**, **Link do
-aplikowania** oraz — gdy inny niż link aplikacji — **Źródło**. Sekcje pogrupowane
-po typie sygnału: *Posty na LinkedIn*, *Strony karier firm*, *Sygnały finansowania
-i ekspansji*, *Rekruterzy*, *Ogłoszenia o pracę*, *Inne sygnały*.
+Każde znalezisko ma pola: **Opublikowano** (czas publikacji oferty, UTC),
+**Typ sygnału** (*Posty na LinkedIn*, *Strony karier firm*, *Sygnały finansowania
+i ekspansji*, *Rekruterzy*, *Ogłoszenia o pracę*, *Inne sygnały*), **Firma**,
+**Projekt** (czym firma/zespół się zajmuje), **Rola**, **Zarobki** (jeśli podane,
+inaczej `—`), **Lokalizacja**, **Link do aplikowania** oraz — gdy inny niż link
+aplikacji — **Źródło**.
 
 ---
 
@@ -105,7 +114,7 @@ hidden-job-scout/
 │   └── config.py               # wczytanie config.yaml
 ├── data/seen.json              # historia (żeby oferty się nie powtarzały)
 ├── reports/                    # tu lądują dzienne raporty .md
-├── tests/                      # 27 testów (bez wywołań prawdziwego API)
+├── tests/                      # 28 testów (bez wywołań prawdziwego API)
 ├── .github/workflows/daily-scan.yml   # cron w chmurze
 └── scripts/                    # uruchamianie lokalne (launchd + run.sh)
 ```
@@ -122,7 +131,7 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
 # 2. Testy jednostkowe — nie kosztują nic, nie ruszają sieci
-.venv/bin/pytest            # → 27 passed
+.venv/bin/pytest            # → 28 passed
 
 # 3. Prawdziwy przebieg (potrzebuje klucza API)
 echo 'GEMINI_API_KEY=...' > .env
@@ -146,7 +155,7 @@ Wszystko w [`config.yaml`](config.yaml) — bez zmian w kodzie:
 | Pole | Znaczenie | Domyślnie |
 |------|-----------|-----------|
 | `roles` | Lista wyszukiwanych ról — dopisz/zmień dowolną | SDET, QA, tester, …, AI tester, AI test engineer, AI SDET |
-| `recency_days` | Pomija oferty starsze niż tyle dni | `30` |
+| `recency_hours` | Pomija oferty starsze niż tyle godzin | `24` |
 | `model` | Model Gemini | `gemini-3.5-flash` |
 
 **Klucz API:** zmienna środowiskowa `GEMINI_API_KEY` — lokalnie w pliku `.env`
@@ -193,5 +202,5 @@ bliski zeru. Aktualny cennik: https://ai.google.dev/gemini-api/docs/pricing
 .venv/bin/pytest
 ```
 
-27 testów jednostkowych (parsowanie JSON, deduplikacja, render raportu, ścieżka
+28 testów jednostkowych (parsowanie JSON, deduplikacja, render raportu, ścieżka
 błędu), żaden nie wywołuje prawdziwego API — bezpieczne do uruchamiania w kółko.

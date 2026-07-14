@@ -18,6 +18,7 @@ class Finding:
     signal_type: str = "job_posting"
     source_url: str | None = None
     location: str | None = None
+    published_at: str | None = None
 
 
 _JSON_BLOCK = re.compile(r"```json\s*(.*?)```", re.DOTALL)
@@ -52,5 +53,6 @@ def extract_findings(text: str) -> list[Finding]:
             signal_type=str(item.get("signal_type") or "job_posting"),
             source_url=item.get("source_url") or None,
             location=item.get("location") or None,
+            published_at=item.get("published_at") or None,
         ))
     return findings

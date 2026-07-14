@@ -10,7 +10,7 @@ class ScoutConfig:
     roles: list
     model: str = "gemini-3.5-flash"
     max_tokens: int = 32000
-    recency_days: int = 30
+    recency_hours: int = 24
     reports_dir: str = "reports"
     seen_file: str = "data/seen.json"
     logs_dir: str = "logs"

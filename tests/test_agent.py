@@ -13,7 +13,9 @@ def test_build_prompt_contains_roles_scope_and_format():
     assert "- QA engineer" in prompt
     assert "remote" in prompt.lower()
     assert '"findings"' in prompt
-    assert "30" in prompt  # recency_days
+    assert "24" in prompt  # recency_hours
+    assert "published_at" in prompt
+    assert "US only" in prompt
 
 
 def test_run_scan_returns_text_and_search_count():

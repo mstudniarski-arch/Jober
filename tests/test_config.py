@@ -17,14 +17,14 @@ def test_load_config_reads_roles_and_defaults(tmp_path):
     assert config.roles == ["AI SDET", "tester"]
     assert config.model == "gemini-3.5-flash"
     assert config.max_tokens == 32000
-    assert config.recency_days == 30
+    assert config.recency_hours == 24
     assert config.seen_file == "data/seen.json"
 
 
 def test_load_config_overrides_defaults(tmp_path):
-    p = write_config(tmp_path, "roles: [QA]\nrecency_days: 14\nmodel: gemini-2.5-pro\n")
+    p = write_config(tmp_path, "roles: [QA]\nrecency_hours: 12\nmodel: gemini-2.5-pro\n")
     config = load_config(p)
-    assert config.recency_days == 14
+    assert config.recency_hours == 12
     assert config.model == "gemini-2.5-pro"
 
 

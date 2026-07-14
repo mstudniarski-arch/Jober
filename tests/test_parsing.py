@@ -9,7 +9,7 @@ VALID = """Here is my research summary.
   {"company": "Acme", "role": "Senior SDET", "apply_url": "https://acme.com/jobs/1",
    "project": "payments platform", "salary": "$120k-150k",
    "signal_type": "career_page", "source_url": "https://acme.com/careers",
-   "location": "Remote (worldwide)"},
+   "location": "Remote (worldwide)", "published_at": "2026-07-14T06:00:00Z"},
   {"company": "Beta", "role": "AI tester", "apply_url": "https://beta.io/x",
    "salary": null}
 ]}
@@ -24,7 +24,9 @@ def test_extracts_findings_from_fenced_block():
         company="Acme", role="Senior SDET", apply_url="https://acme.com/jobs/1",
         project="payments platform", salary="$120k-150k", signal_type="career_page",
         source_url="https://acme.com/careers", location="Remote (worldwide)",
+        published_at="2026-07-14T06:00:00Z",
     )
+    assert findings[1].published_at is None
     assert findings[1].salary is None
     assert findings[1].signal_type == "job_posting"  # default
 

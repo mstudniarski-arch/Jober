@@ -1,7 +1,7 @@
 """Entrypoint: jeden dzienny przebieg skanu."""
 import logging
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import os
@@ -63,6 +63,8 @@ def run(config_path="config.yaml", client=None, report_date=None) -> int:
     duplicates = len(findings) - len(new_findings)
 
     report_path = reports_dir / f"{report_date.isoformat()}.md"
+    if report_path.exists():  # drugi przebieg tego samego dnia — nie nadpisuj
+        report_path = reports_dir / f"{report_date.isoformat()}-{datetime.now().strftime('%H%M%S')}.md"
     report_path.write_text(
         render_report(new_findings, report_date, result.web_searches, duplicates),
         encoding="utf-8",
