@@ -3,7 +3,7 @@ from datetime import date
 from pathlib import Path
 
 from scout.main import run
-from tests.fakes import FakeClient, fake_message, search_block
+from tests.fakes import FakeClient, fake_response
 
 D = date(2026, 7, 12)
 
@@ -32,7 +32,7 @@ def write_config(tmp_path: Path) -> Path:
 
 def test_run_writes_report_and_updates_seen(tmp_path):
     cfg = write_config(tmp_path)
-    client = FakeClient([fake_message(ANSWER, extra_blocks=[search_block()])])
+    client = FakeClient([fake_response(ANSWER, queries=["remote sdet jobs"])])
     assert run(cfg, client=client, report_date=D) == 0
 
     report = (tmp_path / "reports" / "2026-07-12.md").read_text(encoding="utf-8")
@@ -45,8 +45,8 @@ def test_run_writes_report_and_updates_seen(tmp_path):
 
 def test_second_run_filters_duplicates(tmp_path):
     cfg = write_config(tmp_path)
-    run(cfg, client=FakeClient([fake_message(ANSWER)]), report_date=D)
-    run(cfg, client=FakeClient([fake_message(ANSWER)]), report_date=date(2026, 7, 13))
+    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D)
+    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=date(2026, 7, 13))
 
     report2 = (tmp_path / "reports" / "2026-07-13.md").read_text(encoding="utf-8")
     assert "Brak nowych znalezisk" in report2
@@ -55,7 +55,7 @@ def test_second_run_filters_duplicates(tmp_path):
 
 def test_unparseable_answer_writes_raw_fallback(tmp_path):
     cfg = write_config(tmp_path)
-    client = FakeClient([fake_message("no json here, sorry")])
+    client = FakeClient([fake_response("no json here, sorry")])
     assert run(cfg, client=client, report_date=D) == 0
 
     raw = tmp_path / "reports" / "2026-07-12-raw.md"

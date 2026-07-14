@@ -4,7 +4,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-import anthropic
+import os
+
+from google import genai
+from google.genai import errors as genai_errors
 
 from scout.agent import run_scan
 from scout.config import load_config
@@ -13,6 +16,13 @@ from scout.parsing import ParseError, extract_findings
 from scout.report import render_report
 
 logger = logging.getLogger("scout")
+
+
+def _make_client() -> "genai.Client":
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise SystemExit("Brak GEMINI_API_KEY — ustaw w pliku .env lub w sekretach GitHub Actions")
+    return genai.Client(api_key=api_key)
 
 
 def _setup_logging(logs_dir: str, report_date: date) -> None:
@@ -32,11 +42,11 @@ def run(config_path="config.yaml", client=None, report_date=None) -> int:
     config = load_config(config_path)
     report_date = report_date or date.today()
     _setup_logging(config.logs_dir, report_date)
-    client = client or anthropic.Anthropic()
+    client = client or _make_client()
     reports_dir = Path(config.reports_dir)
     reports_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("Start skanu: %d ról, limit wyszukiwań %d", len(config.roles), config.max_web_searches)
+    logger.info("Start skanu: %d ról, model %s", len(config.roles), config.model)
     result = run_scan(client, config)
 
     try:
@@ -66,18 +76,18 @@ def run(config_path="config.yaml", client=None, report_date=None) -> int:
 def main() -> int:
     try:
         return run()
-    except anthropic.AuthenticationError:
-        logger.error("Błąd uwierzytelnienia — ustaw ANTHROPIC_API_KEY (env / .env / GitHub Secret)")
-        return 2
-    except anthropic.RateLimitError:
-        logger.error("Rate limit API — spróbuj później")
-        return 3
-    except anthropic.APIStatusError as e:
-        logger.error("Błąd API %s: %s", e.status_code, e.message)
+    except genai_errors.ClientError as e:
+        if e.code in (401, 403):
+            logger.error("Błąd uwierzytelnienia — sprawdź GEMINI_API_KEY")
+            return 2
+        if e.code == 429:
+            logger.error("Rate limit API — spróbuj później")
+            return 3
+        logger.error("Błąd API %s: %s", e.code, e.message)
         return 4
-    except anthropic.APIConnectionError:
-        logger.error("Błąd połączenia z API Anthropic")
-        return 5
+    except genai_errors.APIError as e:
+        logger.error("Błąd API %s: %s", e.code, e.message)
+        return 4
 
 
 if __name__ == "__main__":

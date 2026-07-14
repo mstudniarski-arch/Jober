@@ -5,9 +5,9 @@ raport ze **zdalnymi ofertami pracy z całego świata** oraz sygnałami tzw.
 **ukrytego rynku pracy** (oferty nigdy niepublikowane na portalach) dla ról
 QA / SDET / tester — w tym **AI tester, AI test engineer, AI SDET**.
 
-Wyszukiwanie wykonuje model **Claude Opus 4.8** przez serwerowe narzędzie web
-search Anthropic — nie potrzebujesz żadnego dodatkowego API do szukania ani
-scrapera. Wystarczy klucz `ANTHROPIC_API_KEY`.
+Wyszukiwanie wykonuje model **Gemini 2.5 Flash** przez **grounding w Google
+Search** (wbudowany w Gemini API) — nie potrzebujesz żadnego dodatkowego API do
+szukania ani scrapera. Wystarczy klucz `GEMINI_API_KEY`.
 
 ---
 
@@ -18,7 +18,7 @@ scrapera. Wystarczy klucz `ANTHROPIC_API_KEY`.
   (role, limit) │
                 ▼
         ┌───────────────────────────────────────────────┐
-        │  Claude Opus 4.8  +  web_search_20260209        │
+        │  Gemini 2.5 Flash  +  Google Search grounding   │
         │  Szuka wg strategii ukrytego rynku pracy:       │
         │   • posty hiring managerów na LinkedIn          │
         │   • strony karier firm (poza agregatorami)      │
@@ -39,7 +39,7 @@ scrapera. Wystarczy klucz `ANTHROPIC_API_KEY`.
 
 Jeden przebieg = jedno wywołanie API. Skrypt:
 
-1. czyta `config.yaml` (lista ról, limit wyszukiwań) i `data/seen.json` (historia),
+1. czyta `config.yaml` (lista ról) i `data/seen.json` (historia),
 2. każe modelowi wyszukać aktualne (≤ 30 dni) zdalne oferty dla podanych ról,
 3. odbiera listę znalezisk w formacie JSON,
 4. wyrzuca duplikaty względem poprzednich dni,
@@ -95,17 +95,17 @@ i ekspansji*, *Rekruterzy*, *Ogłoszenia o pracę*, *Inne sygnały*.
 
 ```
 hidden-job-scout/
-├── config.yaml                 # role, limit wyszukiwań, model — tu edytujesz
+├── config.yaml                 # role, model — tu edytujesz
 ├── scout/
 │   ├── main.py                 # entrypoint: orkiestracja przebiegu
-│   ├── agent.py                # wywołanie Opus 4.8 + web search
+│   ├── agent.py                # wywołanie Gemini 2.5 Flash + Google Search grounding
 │   ├── parsing.py              # wyciąganie znalezisk z JSON
 │   ├── dedup.py                # deduplikacja (data/seen.json)
 │   ├── report.py               # render raportu Markdown
 │   └── config.py               # wczytanie config.yaml
 ├── data/seen.json              # historia (żeby oferty się nie powtarzały)
 ├── reports/                    # tu lądują dzienne raporty .md
-├── tests/                      # 28 testów (bez wywołań prawdziwego API)
+├── tests/                      # 27 testów (bez wywołań prawdziwego API)
 ├── .github/workflows/daily-scan.yml   # cron w chmurze
 └── scripts/                    # uruchamianie lokalne (launchd + run.sh)
 ```
@@ -122,10 +122,10 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
 # 2. Testy jednostkowe — nie kosztują nic, nie ruszają sieci
-.venv/bin/pytest            # → 28 passed
+.venv/bin/pytest            # → 27 passed
 
-# 3. Prawdziwy przebieg (kosztuje ~$0.5–1, potrzebuje klucza API)
-echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env
+# 3. Prawdziwy przebieg (potrzebuje klucza API)
+echo 'GEMINI_API_KEY=...' > .env
 bash scripts/run.sh         # zapisze reports/<dzisiejsza-data>.md i zrobi commit
 ```
 
@@ -146,11 +146,10 @@ Wszystko w [`config.yaml`](config.yaml) — bez zmian w kodzie:
 | Pole | Znaczenie | Domyślnie |
 |------|-----------|-----------|
 | `roles` | Lista wyszukiwanych ról — dopisz/zmień dowolną | SDET, QA, tester, …, AI tester, AI test engineer, AI SDET |
-| `max_web_searches` | Limit wyszukiwań web na przebieg (steruje kosztem) | `20` |
 | `recency_days` | Pomija oferty starsze niż tyle dni | `30` |
-| `model` | Model Anthropic | `claude-opus-4-8` |
+| `model` | Model Gemini | `gemini-2.5-flash` |
 
-**Klucz API:** zmienna środowiskowa `ANTHROPIC_API_KEY` — lokalnie w pliku `.env`
+**Klucz API:** zmienna środowiskowa `GEMINI_API_KEY` — lokalnie w pliku `.env`
 (w `.gitignore`, nie trafia do repo), w GitHub Actions jako sekret repozytorium.
 
 ---
@@ -160,7 +159,7 @@ Wszystko w [`config.yaml`](config.yaml) — bez zmian w kodzie:
 **GitHub Actions** (zalecane — działa niezależnie od tego, czy Mac jest włączony):
 
 1. Wypchnij repo na GitHub (prywatne).
-2. Settings → Secrets and variables → Actions → dodaj sekret `ANTHROPIC_API_KEY`.
+2. Settings → Secrets and variables → Actions → dodaj sekret `GEMINI_API_KEY`.
 3. Workflow [`daily-scan.yml`](.github/workflows/daily-scan.yml) odpala się codziennie
    o 07:00 UTC, robi skan i commituje raport do repo. Można też odpalić ręcznie
    z zakładki *Actions* (przycisk *Run workflow*).
@@ -176,9 +175,10 @@ launchctl load ~/Library/LaunchAgents/com.mski.hidden-job-scout.plist
 
 ## Koszt
 
-Przy domyślnym limicie 20 wyszukiwań/dzień: szacunkowo **$0.5–1/dzień**
-(~$15–30/mies.) — $10/1000 wyszukiwań web + tokeny Opus 4.8. Budżet zmniejszasz
-lub zwiększasz jedną liczbą (`max_web_searches`).
+Tokeny Gemini 2.5 Flash są wielokrotnie tańsze od modeli klasy Opus
+(orientacyjnie $0.30/1M wejście, $2.50/1M wyjście), a grounding w Google Search
+ma dzienny darmowy limit zapytań — przy jednym przebiegu dziennie koszt jest
+bliski zeru. Aktualny cennik: https://ai.google.dev/gemini-api/docs/pricing
 
 ---
 
@@ -188,6 +188,5 @@ lub zwiększasz jedną liczbą (`max_web_searches`).
 .venv/bin/pytest
 ```
 
-28 testów jednostkowych (parsowanie JSON, deduplikacja, render raportu, obsługa
-`pause_turn`, ścieżka błędu), żaden nie wywołuje prawdziwego API — bezpieczne do
-uruchamiania w kółko.
+27 testów jednostkowych (parsowanie JSON, deduplikacja, render raportu, ścieżka
+błędu), żaden nie wywołuje prawdziwego API — bezpieczne do uruchamiania w kółko.

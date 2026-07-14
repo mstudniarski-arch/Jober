@@ -8,8 +8,7 @@ import yaml
 @dataclass
 class ScoutConfig:
     roles: list
-    max_web_searches: int = 20
-    model: str = "claude-opus-4-8"
+    model: str = "gemini-2.5-flash"
     max_tokens: int = 32000
     recency_days: int = 30
     reports_dir: str = "reports"

@@ -15,18 +15,17 @@ def test_load_config_reads_roles_and_defaults(tmp_path):
     p = write_config(tmp_path, "roles:\n  - AI SDET\n  - tester\n")
     config = load_config(p)
     assert config.roles == ["AI SDET", "tester"]
-    assert config.max_web_searches == 20
-    assert config.model == "claude-opus-4-8"
+    assert config.model == "gemini-2.5-flash"
     assert config.max_tokens == 32000
     assert config.recency_days == 30
     assert config.seen_file == "data/seen.json"
 
 
 def test_load_config_overrides_defaults(tmp_path):
-    p = write_config(tmp_path, "roles: [QA]\nmax_web_searches: 5\nmodel: claude-haiku-4-5\n")
+    p = write_config(tmp_path, "roles: [QA]\nrecency_days: 14\nmodel: gemini-2.5-pro\n")
     config = load_config(p)
-    assert config.max_web_searches == 5
-    assert config.model == "claude-haiku-4-5"
+    assert config.recency_days == 14
+    assert config.model == "gemini-2.5-pro"
 
 
 def test_load_config_requires_roles(tmp_path):

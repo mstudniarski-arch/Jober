@@ -1,12 +1,12 @@
-"""Wywołanie Anthropic API: Opus 4.8 + serwerowe narzędzie web search."""
+"""Wywołanie Gemini API: 2.5 Flash + grounding w Google Search."""
 import logging
 from dataclasses import dataclass
+
+from google.genai import types
 
 from scout.config import ScoutConfig
 
 logger = logging.getLogger(__name__)
-
-MAX_CONTINUATIONS = 5
 
 _PROMPT = """You are a job-market research agent. Find CURRENT, fully remote job \
 opportunities and hidden-job-market hiring signals, worldwide, for these roles:
@@ -60,35 +60,22 @@ def build_prompt(config: ScoutConfig) -> str:
     return _PROMPT.format(roles=roles, recency_days=config.recency_days)
 
 
-def _final_text(message) -> str:
-    return "\n\n".join(b.text for b in message.content if getattr(b, "type", None) == "text")
-
-
-def _count_web_searches(message) -> int:
-    return sum(
-        1 for b in message.content
-        if getattr(b, "type", None) == "server_tool_use" and getattr(b, "name", "") == "web_search"
-    )
+def _count_search_queries(response) -> int:
+    candidates = getattr(response, "candidates", None) or []
+    if not candidates:
+        return 0
+    metadata = getattr(candidates[0], "grounding_metadata", None)
+    queries = getattr(metadata, "web_search_queries", None) if metadata else None
+    return len(queries or [])
 
 
 def run_scan(client, config: ScoutConfig) -> ScanResult:
-    user_message = {"role": "user", "content": build_prompt(config)}
-    messages = [user_message]
-    tools = [{"type": "web_search_20260209", "name": "web_search",
-              "max_uses": config.max_web_searches}]
-
-    for attempt in range(MAX_CONTINUATIONS + 1):
-        with client.messages.stream(
-            model=config.model,
-            max_tokens=config.max_tokens,
-            thinking={"type": "adaptive"},
-            tools=tools,
-            messages=messages,
-        ) as stream:
-            message = stream.get_final_message()
-        if message.stop_reason != "pause_turn":
-            return ScanResult(text=_final_text(message), web_searches=_count_web_searches(message))
-        logger.info("pause_turn — kontynuacja %d/%d", attempt + 1, MAX_CONTINUATIONS)
-        messages = [user_message, {"role": "assistant", "content": message.content}]
-
-    raise RuntimeError(f"Skan nie zakończył się po {MAX_CONTINUATIONS} kontynuacjach pause_turn")
+    response = client.models.generate_content(
+        model=config.model,
+        contents=build_prompt(config),
+        config=types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+            max_output_tokens=config.max_tokens,
+        ),
+    )
+    return ScanResult(text=response.text or "", web_searches=_count_search_queries(response))
