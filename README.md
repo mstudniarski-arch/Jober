@@ -114,7 +114,7 @@ hidden-job-scout/
 │   └── config.py               # wczytanie config.yaml
 ├── data/seen.json              # historia (żeby oferty się nie powtarzały)
 ├── reports/                    # tu lądują dzienne raporty .md
-├── tests/                      # 28 testów (bez wywołań prawdziwego API)
+├── tests/                      # 32 testy (bez wywołań prawdziwego API)
 ├── .github/workflows/daily-scan.yml   # cron w chmurze
 └── scripts/                    # uruchamianie lokalne (launchd + run.sh)
 ```
@@ -131,7 +131,7 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
 # 2. Testy jednostkowe — nie kosztują nic, nie ruszają sieci
-.venv/bin/pytest            # → 28 passed
+.venv/bin/pytest            # → 32 passed
 
 # 3. Prawdziwy przebieg (potrzebuje klucza API)
 echo 'GEMINI_API_KEY=...' > .env
@@ -202,5 +202,6 @@ bliski zeru. Aktualny cennik: https://ai.google.dev/gemini-api/docs/pricing
 .venv/bin/pytest
 ```
 
-28 testów jednostkowych (parsowanie JSON, deduplikacja, render raportu, ścieżka
-błędu), żaden nie wywołuje prawdziwego API — bezpieczne do uruchamiania w kółko.
+32 testy jednostkowe (parsowanie JSON, deduplikacja, render raportu, ponowienia
+przy 503/429, ścieżka błędu), żaden nie wywołuje prawdziwego API — bezpieczne do
+uruchamiania w kółko.

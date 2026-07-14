@@ -2,7 +2,11 @@ import json
 from datetime import date
 from pathlib import Path
 
-from scout.main import run
+import pytest
+from google.genai import errors as genai_errors
+
+from scout.config import ScoutConfig
+from scout.main import _scan_with_retry, run
 from tests.fakes import FakeClient, fake_response
 
 D = date(2026, 7, 12)
@@ -70,4 +74,53 @@ def test_second_run_same_day_does_not_overwrite_report(tmp_path):
     run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D)
     assert (tmp_path / "reports" / "2026-07-12.md").read_text(encoding="utf-8") == first
     assert len(list((tmp_path / "reports").glob("*.md"))) == 2
+
+
+CONFIG = ScoutConfig(roles=["SDET"])
+
+
+def _server_error():
+    return genai_errors.ServerError(
+        503, {"error": {"code": 503, "message": "high demand", "status": "UNAVAILABLE"}})
+
+
+def test_retry_on_server_error_then_success():
+    client = FakeClient([_server_error(), _server_error(), fake_response("done")])
+    delays = []
+    result = _scan_with_retry(client, CONFIG, sleep=delays.append)
+    assert result.text == "done"
+    assert delays == [60, 120]  # backoff między próbami
+    assert len(client.models.calls) == 3
+
+
+def test_retry_on_429_rate_limit():
+    rate_limited = genai_errors.ClientError(
+        429, {"error": {"code": 429, "message": "quota", "status": "RESOURCE_EXHAUSTED"}})
+    client = FakeClient([rate_limited, fake_response("done")])
+    delays = []
+    result = _scan_with_retry(client, CONFIG, sleep=delays.append)
+    assert result.text == "done"
+    assert delays == [60]
+
+
+def test_no_retry_on_non_transient_client_error():
+    bad_request = genai_errors.ClientError(
+        400, {"error": {"code": 400, "message": "bad request", "status": "INVALID_ARGUMENT"}})
+    client = FakeClient([bad_request])
+
+    def sleep_forbidden(_):  # przy 400 nie wolno czekać ani ponawiać
+        raise AssertionError("sleep nie powinien być wywołany")
+
+    with pytest.raises(genai_errors.ClientError):
+        _scan_with_retry(client, CONFIG, sleep=sleep_forbidden)
+    assert len(client.models.calls) == 1
+
+
+def test_retry_gives_up_after_four_attempts():
+    client = FakeClient([_server_error() for _ in range(4)])
+    delays = []
+    with pytest.raises(genai_errors.ServerError):
+        _scan_with_retry(client, CONFIG, sleep=delays.append)
+    assert delays == [60, 120, 240]
+    assert len(client.models.calls) == 4
 

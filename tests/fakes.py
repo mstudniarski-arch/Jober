@@ -15,7 +15,10 @@ class _FakeModels:
 
     def generate_content(self, **kwargs):
         self.calls.append(kwargs)
-        return self._queue.pop(0)
+        item = self._queue.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
 
 
 class FakeClient:

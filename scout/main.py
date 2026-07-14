@@ -1,6 +1,7 @@
 """Entrypoint: jeden dzienny przebieg skanu."""
 import logging
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 
@@ -16,6 +17,32 @@ from scout.parsing import ParseError, extract_findings
 from scout.report import render_report
 
 logger = logging.getLogger("scout")
+
+# Odstępy między ponowieniami przy przejściowych błędach API (503/429) — sekundy.
+_RETRY_DELAYS = (60, 120, 240)
+
+
+def _is_transient(error: genai_errors.APIError) -> bool:
+    """5xx (przeciążenie po stronie Google) i 429 (rate limit) warto ponowić."""
+    return isinstance(error, genai_errors.ServerError) or getattr(error, "code", None) == 429
+
+
+def _scan_with_retry(client, config, sleep=time.sleep):
+    """run_scan() z ponowieniami: do 4 prób, odstępy 60/120/240 s.
+
+    Ponawia wyłącznie błędy przejściowe; inne propaguje od razu.
+    """
+    for attempt, delay in enumerate([*_RETRY_DELAYS, None], start=1):
+        try:
+            return run_scan(client, config)
+        except genai_errors.APIError as e:
+            if not _is_transient(e) or delay is None:
+                raise
+            logger.warning(
+                "Przejściowy błąd API %s (próba %d/%d) — ponawiam za %d s",
+                e.code, attempt, len(_RETRY_DELAYS) + 1, delay,
+            )
+            sleep(delay)
 
 
 def _make_client() -> "genai.Client":
@@ -47,7 +74,7 @@ def run(config_path="config.yaml", client=None, report_date=None) -> int:
     reports_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Start skanu: %d ról, model %s", len(config.roles), config.model)
-    result = run_scan(client, config)
+    result = _scan_with_retry(client, config)
 
     try:
         findings = extract_findings(result.text)
