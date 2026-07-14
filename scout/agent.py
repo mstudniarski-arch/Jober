@@ -49,7 +49,7 @@ After your research, end your reply with EXACTLY ONE fenced code block labeled j
     "apply_url": "direct URL to apply or make contact",
     "signal_type": "job_posting | linkedin_post | career_page | funding_news | recruiter_post",
     "source_url": "URL where you found the signal",
-    "location": "remote scope, e.g. 'Remote (worldwide)' or 'Remote (US only)'",
+    "location": "remote scope, e.g. 'Remote (worldwide)' or 'Remote (EMEA)'",
     "published_at": "ISO 8601 UTC publication time, else null"
   }}
 ]}}
