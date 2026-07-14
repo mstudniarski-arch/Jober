@@ -13,7 +13,7 @@ roles:
   - AI test engineer
   - AI SDET
 
-model: gemini-2.5-flash
+model: gemini-3.5-flash
 max_tokens: 32000
 
 # Oferty starsze niż tyle dni są pomijane

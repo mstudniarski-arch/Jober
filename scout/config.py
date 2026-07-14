@@ -8,7 +8,7 @@ import yaml
 @dataclass
 class ScoutConfig:
     roles: list
-    model: str = "gemini-2.5-flash"
+    model: str = "gemini-3.5-flash"
     max_tokens: int = 32000
     recency_days: int = 30
     reports_dir: str = "reports"

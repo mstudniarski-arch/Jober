@@ -22,7 +22,7 @@ def test_run_scan_returns_text_and_search_count():
     assert result.text == "final answer"
     assert result.web_searches == 2
     call = client.models.calls[0]
-    assert call["model"] == "gemini-2.5-flash"
+    assert call["model"] == "gemini-3.5-flash"
     assert call["config"].tools[0].google_search is not None
     assert call["config"].max_output_tokens == 32000
     assert '"findings"' in call["contents"]

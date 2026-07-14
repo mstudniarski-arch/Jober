@@ -1,4 +1,4 @@
-"""Wywołanie Gemini API: 2.5 Flash + grounding w Google Search."""
+"""Wywołanie Gemini API: 3.5 Flash + grounding w Google Search."""
 import logging
 from dataclasses import dataclass
 

@@ -5,7 +5,7 @@ raport ze **zdalnymi ofertami pracy z całego świata** oraz sygnałami tzw.
 **ukrytego rynku pracy** (oferty nigdy niepublikowane na portalach) dla ról
 QA / SDET / tester — w tym **AI tester, AI test engineer, AI SDET**.
 
-Wyszukiwanie wykonuje model **Gemini 2.5 Flash** przez **grounding w Google
+Wyszukiwanie wykonuje model **Gemini 3.5 Flash** przez **grounding w Google
 Search** (wbudowany w Gemini API) — nie potrzebujesz żadnego dodatkowego API do
 szukania ani scrapera. Wystarczy klucz `GEMINI_API_KEY`.
 
@@ -18,7 +18,7 @@ szukania ani scrapera. Wystarczy klucz `GEMINI_API_KEY`.
   (role, limit) │
                 ▼
         ┌───────────────────────────────────────────────┐
-        │  Gemini 2.5 Flash  +  Google Search grounding   │
+        │  Gemini 3.5 Flash  +  Google Search grounding   │
         │  Szuka wg strategii ukrytego rynku pracy:       │
         │   • posty hiring managerów na LinkedIn          │
         │   • strony karier firm (poza agregatorami)      │
@@ -98,7 +98,7 @@ hidden-job-scout/
 ├── config.yaml                 # role, model — tu edytujesz
 ├── scout/
 │   ├── main.py                 # entrypoint: orkiestracja przebiegu
-│   ├── agent.py                # wywołanie Gemini 2.5 Flash + Google Search grounding
+│   ├── agent.py                # wywołanie Gemini 3.5 Flash + Google Search grounding
 │   ├── parsing.py              # wyciąganie znalezisk z JSON
 │   ├── dedup.py                # deduplikacja (data/seen.json)
 │   ├── report.py               # render raportu Markdown
@@ -147,7 +147,7 @@ Wszystko w [`config.yaml`](config.yaml) — bez zmian w kodzie:
 |------|-----------|-----------|
 | `roles` | Lista wyszukiwanych ról — dopisz/zmień dowolną | SDET, QA, tester, …, AI tester, AI test engineer, AI SDET |
 | `recency_days` | Pomija oferty starsze niż tyle dni | `30` |
-| `model` | Model Gemini | `gemini-2.5-flash` |
+| `model` | Model Gemini | `gemini-3.5-flash` |
 
 **Klucz API:** zmienna środowiskowa `GEMINI_API_KEY` — lokalnie w pliku `.env`
 (w `.gitignore`, nie trafia do repo), w GitHub Actions jako sekret repozytorium.
@@ -175,10 +175,15 @@ launchctl load ~/Library/LaunchAgents/com.mski.hidden-job-scout.plist
 
 ## Koszt
 
-Tokeny Gemini 2.5 Flash są wielokrotnie tańsze od modeli klasy Opus
-(orientacyjnie $0.30/1M wejście, $2.50/1M wyjście), a grounding w Google Search
-ma dzienny darmowy limit zapytań — przy jednym przebiegu dziennie koszt jest
+Tokeny modeli klasy Flash są tanie, a przy jednym przebiegu dziennie koszt jest
 bliski zeru. Aktualny cennik: https://ai.google.dev/gemini-api/docs/pricing
+
+> **Ważne — grounding wymaga billingu.** Wyszukiwanie Google (grounding) działa
+> tylko z kluczem z projektu z **włączonym billingiem** (poziom płatny Gemini
+> API). Na darmowym poziomie każde wywołanie z groundingiem kończy się błędem
+> `429 RESOURCE_EXHAUSTED` — sam model odpowiada, ale nie może szukać w sieci.
+> Billing włączysz w [Google AI Studio](https://aistudio.google.com/) (sekcja
+> API keys / Billing) lub w konsoli Google Cloud dla projektu klucza.
 
 ---
 
