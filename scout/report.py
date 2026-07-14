@@ -34,7 +34,7 @@ def _format_published(value):
     return value or "—"
 
 
-def render_report(findings: list, report_date: date, web_searches: int, duplicates: int) -> str:
+def render_report(findings: list, report_date: date, web_searches: int, duplicates: int, dead_links: int = 0) -> str:
     lines = [f"# Hidden Job Scout — raport {report_date.isoformat()}", ""]
     if not findings:
         lines += ["Brak nowych znalezisk w tym przebiegu.", ""]
@@ -48,7 +48,7 @@ def render_report(findings: list, report_date: date, web_searches: int, duplicat
         for finding in ordered:
             lines += _render_finding(finding)
     lines += ["---", f"*Wyszukiwań web: {web_searches} · Nowe znaleziska: {len(findings)} · "
-              f"Odfiltrowane duplikaty: {duplicates}*", ""]
+              f"Odfiltrowane duplikaty: {duplicates} · Martwe linki: {dead_links}*", ""]
     return "\n".join(lines)
 
 

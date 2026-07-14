@@ -37,6 +37,12 @@ szukania ani scrapera. Wystarczy klucz `GEMINI_API_KEY`.
         └──────────────────┘      raportach, nie wraca)
                 │  tylko nowe znaleziska
                 ▼
+        ┌──────────────────┐
+        │  Weryfikacja      │  HTTP-check każdego linku:
+        │  linków           │  404/410/wygasłe → odpadają
+        └──────────────────┘
+                │  tylko żywe oferty
+                ▼
         reports/RRRR-MM-DD.md   ← gotowy raport Markdown
 ```
 
@@ -48,9 +54,12 @@ Jeden przebieg = jedno wywołanie API. Skrypt:
    uwzględniane, gdy ogłoszenie jest po angielsku,
 3. odbiera listę znalezisk w formacie JSON,
 4. wyrzuca duplikaty względem poprzednich dni,
-5. renderuje raport `reports/RRRR-MM-DD.md`, posortowany **od najnowszych**
+5. sprawdza każdy link HTTP-em i odrzuca oferty martwe lub wygasłe (404/410,
+   nieosiągalne domeny, strony z komunikatem «no longer accepting applications»;
+   blokady anty-botowe, np. LinkedIn, nie dyskwalifikują oferty),
+6. renderuje raport `reports/RRRR-MM-DD.md`, posortowany **od najnowszych**
    (pole „Opublikowano"),
-6. dopisuje nowe pozycje do `data/seen.json`.
+7. dopisuje nowe pozycje do `data/seen.json`.
 
 ---
 
@@ -88,7 +97,7 @@ Najświeższe zdalne oferty z całego świata, posortowane od najnowszych.
 - **Link do aplikowania:** https://linkedin.com/posts/jane-doe-hiring
 
 ---
-*Wyszukiwań web: 18 · Nowe znaleziska: 2 · Odfiltrowane duplikaty: 4*
+*Wyszukiwań web: 18 · Nowe znaleziska: 2 · Odfiltrowane duplikaty: 4 · Martwe linki: 1*
 ```
 
 Każde znalezisko ma pola: **Opublikowano** (czas publikacji oferty, UTC),
@@ -114,7 +123,7 @@ hidden-job-scout/
 │   └── config.py               # wczytanie config.yaml
 ├── data/seen.json              # historia (żeby oferty się nie powtarzały)
 ├── reports/                    # tu lądują dzienne raporty .md
-├── tests/                      # 32 testy (bez wywołań prawdziwego API)
+├── tests/                      # 37 testów (bez wywołań prawdziwego API)
 ├── .github/workflows/daily-scan.yml   # cron w chmurze
 └── scripts/                    # uruchamianie lokalne (launchd + run.sh)
 ```
@@ -131,7 +140,7 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
 # 2. Testy jednostkowe — nie kosztują nic, nie ruszają sieci
-.venv/bin/pytest            # → 32 passed
+.venv/bin/pytest            # → 37 passed
 
 # 3. Prawdziwy przebieg (potrzebuje klucza API)
 echo 'GEMINI_API_KEY=...' > .env
@@ -202,6 +211,7 @@ bliski zeru. Aktualny cennik: https://ai.google.dev/gemini-api/docs/pricing
 .venv/bin/pytest
 ```
 
-32 testy jednostkowe (parsowanie JSON, deduplikacja, render raportu, ponowienia
-przy 503/429, ścieżka błędu), żaden nie wywołuje prawdziwego API — bezpieczne do
+37 testów jednostkowych (parsowanie JSON, deduplikacja, weryfikacja linków,
+render raportu, ponowienia przy 503/429, ścieżka błędu), żaden nie wywołuje
+prawdziwego API — bezpieczne do
 uruchamiania w kółko.

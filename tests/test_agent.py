@@ -16,6 +16,7 @@ def test_build_prompt_contains_roles_scope_and_format():
     assert "24" in prompt  # recency_hours
     assert "published_at" in prompt
     assert "US only" in prompt
+    assert "verbatim" in prompt
 
 
 def test_run_scan_returns_text_and_search_count():

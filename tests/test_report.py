@@ -11,7 +11,7 @@ def test_report_renders_all_fields():
                 project="payments platform", salary="$120k-150k",
                 signal_type="career_page", source_url="https://acme.com/careers",
                 location="Remote (worldwide)", published_at="2026-07-12T09:30:00Z")
-    out = render_report([f], D, web_searches=18, duplicates=3)
+    out = render_report([f], D, web_searches=18, duplicates=3, dead_links=2)
     assert "# Hidden Job Scout — raport 2026-07-12" in out
     assert "### Acme — Senior SDET" in out
     assert "- **Opublikowano:** 2026-07-12 09:30 UTC" in out
@@ -25,6 +25,7 @@ def test_report_renders_all_fields():
     assert "- **Źródło:** https://acme.com/careers" in out
     assert "Wyszukiwań web: 18" in out
     assert "Odfiltrowane duplikaty: 3" in out
+    assert "Martwe linki: 2" in out
 
 
 def test_sorted_freshest_first_and_unknown_dates_last():

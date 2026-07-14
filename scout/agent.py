@@ -30,6 +30,10 @@ China-based companies when the posting is in English.
 - FRESHNESS IS CRITICAL: include ONLY offers published within the last {recency_hours} hours.
 Check the posting date on the page; if you cannot confirm it is within that window, skip it.
 Newest offers matter most.
+- LINK QUALITY: "apply_url" must be the exact, working URL of the live posting you actually
+opened via search — copy it verbatim, never construct or guess URLs. Prefer the specific
+posting URL (with a job ID or slug) over a generic careers page. Skip offers whose page says
+they are closed, expired, or no longer accepting applications.
 - For each finding, set "published_at" to the publication time in ISO 8601 UTC
 (e.g. "2026-07-14T09:00:00Z"); estimate it from "posted X hours ago" when needed;
 null only if truly unknown.

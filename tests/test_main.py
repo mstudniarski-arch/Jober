@@ -22,6 +22,10 @@ ANSWER = """Research done.
 ```"""
 
 
+def no_verify(findings):
+    return list(findings), []
+
+
 def write_config(tmp_path: Path) -> Path:
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
@@ -37,7 +41,7 @@ def write_config(tmp_path: Path) -> Path:
 def test_run_writes_report_and_updates_seen(tmp_path):
     cfg = write_config(tmp_path)
     client = FakeClient([fake_response(ANSWER, queries=["remote sdet jobs"])])
-    assert run(cfg, client=client, report_date=D) == 0
+    assert run(cfg, client=client, report_date=D, verify=no_verify) == 0
 
     report = (tmp_path / "reports" / "2026-07-12.md").read_text(encoding="utf-8")
     assert "Acme — SDET" in report
@@ -49,8 +53,8 @@ def test_run_writes_report_and_updates_seen(tmp_path):
 
 def test_second_run_filters_duplicates(tmp_path):
     cfg = write_config(tmp_path)
-    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D)
-    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=date(2026, 7, 13))
+    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D, verify=no_verify)
+    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=date(2026, 7, 13), verify=no_verify)
 
     report2 = (tmp_path / "reports" / "2026-07-13.md").read_text(encoding="utf-8")
     assert "Brak nowych znalezisk" in report2
@@ -60,7 +64,7 @@ def test_second_run_filters_duplicates(tmp_path):
 def test_unparseable_answer_writes_raw_fallback(tmp_path):
     cfg = write_config(tmp_path)
     client = FakeClient([fake_response("no json here, sorry")])
-    assert run(cfg, client=client, report_date=D) == 0
+    assert run(cfg, client=client, report_date=D, verify=no_verify) == 0
 
     raw = tmp_path / "reports" / "2026-07-12-raw.md"
     assert raw.read_text(encoding="utf-8") == "no json here, sorry"
@@ -69,9 +73,9 @@ def test_unparseable_answer_writes_raw_fallback(tmp_path):
 
 def test_second_run_same_day_does_not_overwrite_report(tmp_path):
     cfg = write_config(tmp_path)
-    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D)
+    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D, verify=no_verify)
     first = (tmp_path / "reports" / "2026-07-12.md").read_text(encoding="utf-8")
-    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D)
+    run(cfg, client=FakeClient([fake_response(ANSWER)]), report_date=D, verify=no_verify)
     assert (tmp_path / "reports" / "2026-07-12.md").read_text(encoding="utf-8") == first
     assert len(list((tmp_path / "reports").glob("*.md"))) == 2
 
@@ -123,4 +127,19 @@ def test_retry_gives_up_after_four_attempts():
         _scan_with_retry(client, CONFIG, sleep=delays.append)
     assert delays == [60, 120, 240]
     assert len(client.models.calls) == 4
+
+
+def test_dead_links_are_dropped_counted_and_remembered(tmp_path):
+    cfg = write_config(tmp_path)
+
+    def drop_all(findings):
+        return [], list(findings)
+
+    client = FakeClient([fake_response(ANSWER)])
+    assert run(cfg, client=client, report_date=D, verify=drop_all) == 0
+    report = (tmp_path / "reports" / "2026-07-12.md").read_text(encoding="utf-8")
+    assert "Brak nowych znalezisk" in report
+    assert "Martwe linki: 1" in report
+    seen = json.loads((tmp_path / "data" / "seen.json").read_text(encoding="utf-8"))
+    assert seen["seen"] == ["acme.com/jobs/1"]  # martwy link też zapamiętany
 

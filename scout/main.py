@@ -15,6 +15,7 @@ from scout.config import load_config
 from scout.dedup import filter_new, finding_key, load_seen, save_seen
 from scout.parsing import ParseError, extract_findings
 from scout.report import render_report
+from scout.verify import verify_findings
 
 logger = logging.getLogger("scout")
 
@@ -65,11 +66,12 @@ def _setup_logging(logs_dir: str, report_date: date) -> None:
     )
 
 
-def run(config_path="config.yaml", client=None, report_date=None) -> int:
+def run(config_path="config.yaml", client=None, report_date=None, verify=None) -> int:
     config = load_config(config_path)
     report_date = report_date or date.today()
     _setup_logging(config.logs_dir, report_date)
     client = client or _make_client()
+    verify = verify or verify_findings
     reports_dir = Path(config.reports_dir)
     reports_dir.mkdir(parents=True, exist_ok=True)
 
@@ -89,14 +91,18 @@ def run(config_path="config.yaml", client=None, report_date=None) -> int:
     new_findings = filter_new(findings, seen)
     duplicates = len(findings) - len(new_findings)
 
+    new_findings, dead_findings = verify(new_findings)
+    if dead_findings:
+        logger.info("Odrzucono %d ofert z martwymi/nieaktualnymi linkami", len(dead_findings))
+
     report_path = reports_dir / f"{report_date.isoformat()}.md"
     if report_path.exists():  # drugi przebieg tego samego dnia — nie nadpisuj
         report_path = reports_dir / f"{report_date.isoformat()}-{datetime.now().strftime('%H%M%S')}.md"
     report_path.write_text(
-        render_report(new_findings, report_date, result.web_searches, duplicates),
+        render_report(new_findings, report_date, result.web_searches, duplicates, len(dead_findings)),
         encoding="utf-8",
     )
-    seen.update(finding_key(f) for f in new_findings)
+    seen.update(finding_key(f) for f in [*new_findings, *dead_findings])
     save_seen(config.seen_file, seen)
     logger.info("Raport: %s (%d nowych, %d duplikatów)", report_path, len(new_findings), duplicates)
     return 0
