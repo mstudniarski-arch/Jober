@@ -142,7 +142,7 @@ def main() -> int:
             logger.error("Błąd uwierzytelnienia — sprawdź GEMINI_API_KEY")
             return 2
         if e.code == 429:
-            logger.error("Rate limit API — spróbuj później")
+            logger.error("Limit API lub wyczerpane środki: %s", e.message)
             return 3
         logger.error("Błąd API %s: %s", e.code, e.message)
         return 4
