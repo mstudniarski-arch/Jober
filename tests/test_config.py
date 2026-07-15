@@ -23,10 +23,10 @@ def test_load_config_reads_roles_and_defaults(tmp_path):
 
 
 def test_load_config_overrides_defaults(tmp_path):
-    p = write_config(tmp_path, "roles: [QA]\nrecency_hours: 12\nmodel: gemini-2.5-pro\n")
+    p = write_config(tmp_path, "roles: [QA]\nrecency_hours: 12\nmodel: llama-3.1-8b-instant\n")
     config = load_config(p)
     assert config.recency_hours == 12
-    assert config.model == "gemini-2.5-pro"
+    assert config.model == "llama-3.1-8b-instant"
 
 
 def test_load_config_requires_roles(tmp_path):
