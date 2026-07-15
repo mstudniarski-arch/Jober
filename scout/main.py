@@ -7,8 +7,8 @@ from pathlib import Path
 
 import os
 
-from google import genai
-from google.genai import errors as genai_errors
+import groq
+from groq import Groq
 
 from scout.agent import run_scan
 from scout.config import load_config
@@ -23,9 +23,11 @@ logger = logging.getLogger("scout")
 _RETRY_DELAYS = (60, 120, 240)
 
 
-def _is_transient(error: genai_errors.APIError) -> bool:
-    """5xx (przeciążenie po stronie Google) i 429 (rate limit) warto ponowić."""
-    return isinstance(error, genai_errors.ServerError) or getattr(error, "code", None) == 429
+def _is_transient(error) -> bool:
+    """429 (rate limit) i 5xx po stronie Groq warto ponowić."""
+    if isinstance(error, groq.RateLimitError):
+        return True
+    return isinstance(error, groq.APIStatusError) and error.status_code >= 500
 
 
 def _scan_with_retry(client, config, sleep=time.sleep, **scan_kwargs):
@@ -36,12 +38,12 @@ def _scan_with_retry(client, config, sleep=time.sleep, **scan_kwargs):
     for attempt, delay in enumerate([*_RETRY_DELAYS, None], start=1):
         try:
             return run_scan(client, config, **scan_kwargs)
-        except genai_errors.APIError as e:
+        except groq.APIStatusError as e:
             if not _is_transient(e) or delay is None:
                 raise
             logger.warning(
                 "Przejściowy błąd API %s (próba %d/%d) — ponawiam za %d s",
-                e.code, attempt, len(_RETRY_DELAYS) + 1, delay,
+                e.status_code, attempt, len(_RETRY_DELAYS) + 1, delay,
             )
             sleep(delay)
 
@@ -65,11 +67,11 @@ def _parse_section(text, reports_dir, report_date, label):
         return [], True
 
 
-def _make_client() -> "genai.Client":
-    api_key = os.environ.get("GEMINI_API_KEY")
+def _make_client() -> Groq:
+    api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        raise SystemExit("Brak GEMINI_API_KEY — ustaw w pliku .env lub w sekretach GitHub Actions")
-    return genai.Client(api_key=api_key)
+        raise SystemExit("Brak GROQ_API_KEY — ustaw w pliku .env lub w sekretach GitHub Actions")
+    return Groq(api_key=api_key)
 
 
 def _setup_logging(logs_dir: str, report_date: date) -> None:
@@ -85,7 +87,7 @@ def _setup_logging(logs_dir: str, report_date: date) -> None:
     )
 
 
-def run(config_path="config.yaml", client=None, report_date=None, verify=None) -> int:
+def run(config_path="config.yaml", client=None, report_date=None, verify=None, search_fn=None) -> int:
     config = load_config(config_path)
     report_date = report_date or date.today()
     _setup_logging(config.logs_dir, report_date)
@@ -96,13 +98,14 @@ def run(config_path="config.yaml", client=None, report_date=None, verify=None) -
 
     logger.info("Start skanu: %d ról QA + %d ról AI, model %s",
                 len(config.roles), len(config.ai_roles), config.model)
-    result = _scan_with_retry(client, config)
+    result = _scan_with_retry(client, config, search_fn=search_fn)
     findings, qa_failed = _parse_section(result.text, reports_dir, report_date, "qa")
     web_searches = result.web_searches
 
     ai_failed = False
     if config.ai_roles:
-        ai_result = _scan_with_retry(client, config, roles=config.ai_roles, junior_only=True)
+        ai_result = _scan_with_retry(client, config, roles=config.ai_roles, junior_only=True,
+                                     search_fn=search_fn)
         web_searches += ai_result.web_searches
         ai_findings, ai_failed = _parse_section(ai_result.text, reports_dir, report_date, "ai")
         ai_findings = _drop_senior(ai_findings)
@@ -137,18 +140,18 @@ def run(config_path="config.yaml", client=None, report_date=None, verify=None) -
 def main() -> int:
     try:
         return run()
-    except genai_errors.ClientError as e:
-        if e.code in (401, 403):
-            logger.error("Błąd uwierzytelnienia — sprawdź GEMINI_API_KEY")
-            return 2
-        if e.code == 429:
-            logger.error("Limit API lub wyczerpane środki: %s", e.message)
-            return 3
-        logger.error("Błąd API %s: %s", e.code, e.message)
+    except groq.AuthenticationError:
+        logger.error("Błąd uwierzytelnienia — sprawdź GROQ_API_KEY")
+        return 2
+    except groq.RateLimitError as e:
+        logger.error("Limit API Groq: %s", e)
+        return 3
+    except groq.APIStatusError as e:
+        logger.error("Błąd API %s: %s", e.status_code, e)
         return 4
-    except genai_errors.APIError as e:
-        logger.error("Błąd API %s: %s", e.code, e.message)
-        return 4
+    except groq.APIConnectionError:
+        logger.error("Błąd połączenia z API Groq")
+        return 5
 
 
 if __name__ == "__main__":

@@ -1,48 +1,47 @@
-from types import SimpleNamespace
-
 from scout.agent import build_prompt, run_scan
 from scout.config import ScoutConfig
-from tests.fakes import FakeClient, fake_response
+from tests.fakes import FakeClient, fake_completion
 
 CONFIG = ScoutConfig(roles=["AI SDET", "QA engineer"])
+RESULTS = [{"title": "Acme hiring SDET", "url": "https://acme.com/jobs/1", "body": "Remote SDET role"}]
 
 
-def test_build_prompt_contains_roles_scope_and_format():
-    prompt = build_prompt(CONFIG)
+def test_build_prompt_contains_roles_results_and_format():
+    prompt = build_prompt(CONFIG, results=RESULTS)
     assert "- AI SDET" in prompt
     assert "- QA engineer" in prompt
-    assert "remote" in prompt.lower()
+    assert "https://acme.com/jobs/1" in prompt
+    assert "Acme hiring SDET" in prompt
     assert '"findings"' in prompt
-    assert "24" in prompt  # recency_hours
-    assert "published_at" in prompt
+    assert "VERBATIM" in prompt
     assert "US only" in prompt
-    assert "verbatim" in prompt
     assert "SENIORITY" not in prompt
 
 
-def test_junior_only_prompt_lists_ai_roles_and_seniority_filter():
-    prompt = build_prompt(CONFIG, roles=["Junior AI Engineer", "AI Engineer"], junior_only=True)
+def test_junior_only_prompt_adds_seniority_filter():
+    prompt = build_prompt(CONFIG, roles=["Junior AI Engineer"], junior_only=True)
     assert "- Junior AI Engineer" in prompt
-    assert "- AI Engineer" in prompt
-    assert "- AI SDET" not in prompt  # role QA nie przeciekają do sekcji AI
+    assert "- AI SDET" not in prompt
     assert "SENIORITY" in prompt
     assert '"Senior"' in prompt
 
 
-def test_run_scan_returns_text_and_search_count():
-    client = FakeClient([fake_response("final answer", queries=["q1", "q2"])])
-    result = run_scan(client, CONFIG)
-    assert result.text == "final answer"
-    assert result.web_searches == 2
-    call = client.models.calls[0]
-    assert call["model"] == "gemini-3.5-flash"
-    assert call["config"].tools[0].google_search is not None
-    assert call["config"].max_output_tokens == 32000
-    assert '"findings"' in call["contents"]
+def test_run_scan_searches_and_extracts():
+    client = FakeClient([fake_completion("extracted")])
+    searched = []
+    def fn(query, max_results):
+        searched.append(query)
+        return [{"title": "T", "href": "https://t.io/1", "body": "b"}]
+    result = run_scan(client, CONFIG, search_fn=fn)
+    assert result.text == "extracted"
+    assert result.web_searches == 2  # po jednym zapytaniu na rolę
+    assert len(searched) == 2
+    call = client.calls[0]
+    assert call["model"] == "llama-3.3-70b-versatile"
+    assert call["max_tokens"] == 4096
+    assert "https://t.io/1" in call["messages"][0]["content"]
 
 
-def test_run_scan_handles_missing_grounding_metadata():
-    response = SimpleNamespace(text="ok", candidates=[SimpleNamespace(grounding_metadata=None)])
-    result = run_scan(FakeClient([response]), CONFIG)
-    assert result.text == "ok"
-    assert result.web_searches == 0
+def test_empty_results_render_placeholder():
+    prompt = build_prompt(CONFIG, results=[])
+    assert "(no results)" in prompt

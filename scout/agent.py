@@ -1,61 +1,54 @@
-"""Wywołanie Gemini API: 3.5 Flash + grounding w Google Search."""
+"""Ekstrakcja ofert z wyników wyszukiwania (DuckDuckGo) przez darmowy LLM na Groq."""
 import logging
 from dataclasses import dataclass
 
-from google.genai import types
-
 from scout.config import ScoutConfig
+from scout.search import search_offers
 
 logger = logging.getLogger(__name__)
 
-_PROMPT = """You are a job-market research agent. Find CURRENT, fully remote job \
-opportunities and hidden-job-market hiring signals, worldwide, for these roles:
+_SENIORITY_FILTER = (
+    '- SENIORITY: junior/entry to mid level ONLY — skip any posting whose title contains '
+    '"Senior", "Staff", "Principal", or "Lead".'
+)
+
+_PROMPT = """You are a job-market research assistant. Below are web search results \
+(DuckDuckGo, limited to the LAST 24 HOURS) for remote job openings for these roles:
 
 {roles}
 
-Search strategy — cover ALL of these angles, not just job boards:
-1. LinkedIn posts by hiring managers, team leads, and employees announcing open roles \
-("we're hiring", "join my team", "DM me").
-2. Company career pages with relevant openings (prefer postings NOT syndicated to big aggregators).
-3. Recent funding rounds, product launches, or expansion news implying the company is hiring \
-QA/test engineers — then check their careers page.
-4. Recruiter and executive-search posts looking for candidates for these roles.
-5. Classic job postings as a supplement — only with a direct application link.
+SEARCH RESULTS (numbered; each has TITLE / URL / SNIPPET):
+
+{results}
+
+From ONLY these results, extract real, fully remote job offers worldwide.
 
 Constraints:
 - Fully remote positions only. Skip onsite/hybrid. EXCLUDE offers restricted to US-based
 candidates ("US only", "must be authorized to work in the US", US-timezone-only). Offers open
 worldwide or to broad regions (EU, EMEA, APAC, LATAM) are in scope. Include offers from
 China-based companies when the posting is in English.
-- FRESHNESS IS CRITICAL: include ONLY offers published within the last {recency_hours} hours.
-Check the posting date on the page; if you cannot confirm it is within that window, skip it.
-Newest offers matter most.
-- LINK QUALITY: "apply_url" must be the exact, working URL of the live posting you actually
-opened via search — copy it verbatim, never construct or guess URLs. Prefer the specific
-posting URL (with a job ID or slug) over a generic careers page. Skip offers whose page says
-they are closed, expired, or no longer accepting applications.
+- Use ONLY information present in the results. Do not invent companies, salaries, or URLs.
+- "apply_url" must be copied VERBATIM from a result's URL field. Never construct or guess URLs.
+- Skip ads, aggregator landing pages without a specific offer, and results that are clearly
+not job postings for the listed roles.
 {seniority}
-- For each finding, set "published_at" to the publication time in ISO 8601 UTC
-(e.g. "2026-07-14T09:00:00Z"); estimate it from "posted X hours ago" when needed;
-null only if truly unknown.
-- Prefer primary sources (the company's own page, the original LinkedIn post) over aggregators.
-- Do not invent anything. Every finding must come from a page you actually found via search. \
-If salary is not stated, use null.
+- If salary is not stated in the snippet, use null. If publication time is not explicit, use null.
 
-After your research, end your reply with EXACTLY ONE fenced code block labeled json:
+End your reply with EXACTLY ONE fenced code block labeled json:
 
 ```json
 {{"findings": [
   {{
     "company": "company name",
-    "project": "what the company/team builds (short)",
+    "project": "what the company/team builds (short, from the snippet)",
     "role": "job title",
-    "salary": "salary or range as stated, else null",
-    "apply_url": "direct URL to apply or make contact",
+    "salary": "salary as stated, else null",
+    "apply_url": "exact URL copied from a result",
     "signal_type": "job_posting | linkedin_post | career_page | funding_news | recruiter_post",
-    "source_url": "URL where you found the signal",
+    "source_url": "the result URL it came from",
     "location": "remote scope, e.g. 'Remote (worldwide)' or 'Remote (EMEA)'",
-    "published_at": "ISO 8601 UTC publication time, else null"
+    "published_at": "ISO 8601 UTC if explicit in the result, else null"
   }}
 ]}}
 ```
@@ -69,38 +62,27 @@ class ScanResult:
     web_searches: int
 
 
-_SENIORITY_FILTER = (
-    '- SENIORITY: junior/entry to mid level ONLY — skip any posting whose title contains '
-    '"Senior", "Staff", "Principal", or "Lead".'
-)
+def _format_results(results) -> str:
+    blocks = [f"[{i}] TITLE: {r['title']}\nURL: {r['url']}\nSNIPPET: {r['body']}"
+              for i, r in enumerate(results, start=1)]
+    return "\n\n".join(blocks) or "(no results)"
 
 
-def build_prompt(config: ScoutConfig, roles=None, junior_only=False) -> str:
+def build_prompt(config: ScoutConfig, roles=None, junior_only=False, results=()) -> str:
     role_list = config.roles if roles is None else roles
     roles_text = "\n".join(f"- {role}" for role in role_list)
-    return _PROMPT.format(
-        roles=roles_text,
-        recency_hours=config.recency_hours,
-        seniority=_SENIORITY_FILTER if junior_only else "",
-    )
+    return _PROMPT.format(roles=roles_text, results=_format_results(list(results)),
+                          seniority=_SENIORITY_FILTER if junior_only else "")
 
 
-def _count_search_queries(response) -> int:
-    candidates = getattr(response, "candidates", None) or []
-    if not candidates:
-        return 0
-    metadata = getattr(candidates[0], "grounding_metadata", None)
-    queries = getattr(metadata, "web_search_queries", None) if metadata else None
-    return len(queries or [])
-
-
-def run_scan(client, config: ScoutConfig, roles=None, junior_only=False) -> ScanResult:
-    response = client.models.generate_content(
+def run_scan(client, config: ScoutConfig, roles=None, junior_only=False, search_fn=None) -> ScanResult:
+    role_list = config.roles if roles is None else roles
+    results, query_count = search_offers(role_list, search_fn=search_fn)
+    prompt = build_prompt(config, roles=role_list, junior_only=junior_only, results=results)
+    completion = client.chat.completions.create(
         model=config.model,
-        contents=build_prompt(config, roles=roles, junior_only=junior_only),
-        config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())],
-            max_output_tokens=config.max_tokens,
-        ),
+        max_tokens=config.max_tokens,
+        messages=[{"role": "user", "content": prompt}],
     )
-    return ScanResult(text=response.text or "", web_searches=_count_search_queries(response))
+    text = completion.choices[0].message.content or ""
+    return ScanResult(text=text, web_searches=query_count)

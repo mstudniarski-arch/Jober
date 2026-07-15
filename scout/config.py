@@ -9,8 +9,8 @@ import yaml
 class ScoutConfig:
     roles: list
     ai_roles: list = field(default_factory=list)
-    model: str = "gemini-3.5-flash"
-    max_tokens: int = 32000
+    model: str = "llama-3.3-70b-versatile"
+    max_tokens: int = 4096
     recency_hours: int = 24
     reports_dir: str = "reports"
     seen_file: str = "data/seen.json"

@@ -1,19 +1,17 @@
-"""Fałszywy klient Gemini do testów — bez sieci."""
+"""Fałszywe obiekty do testów — bez sieci."""
 from types import SimpleNamespace
 
 
-def fake_response(text, queries=()):
-    metadata = SimpleNamespace(web_search_queries=list(queries))
-    candidate = SimpleNamespace(grounding_metadata=metadata)
-    return SimpleNamespace(text=text, candidates=[candidate])
+def fake_completion(text):
+    return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=text))])
 
 
-class _FakeModels:
+class _FakeCompletions:
     def __init__(self, queue):
         self._queue = list(queue)
         self.calls = []
 
-    def generate_content(self, **kwargs):
+    def create(self, **kwargs):
         self.calls.append(kwargs)
         item = self._queue.pop(0)
         if isinstance(item, Exception):
@@ -23,4 +21,12 @@ class _FakeModels:
 
 class FakeClient:
     def __init__(self, responses):
-        self.models = _FakeModels(responses)
+        self.chat = SimpleNamespace(completions=_FakeCompletions(responses))
+
+    @property
+    def calls(self):
+        return self.chat.completions.calls
+
+
+def no_search(query, max_results):
+    return []

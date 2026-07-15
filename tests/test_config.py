@@ -15,8 +15,8 @@ def test_load_config_reads_roles_and_defaults(tmp_path):
     p = write_config(tmp_path, "roles:\n  - AI SDET\n  - tester\n")
     config = load_config(p)
     assert config.roles == ["AI SDET", "tester"]
-    assert config.model == "gemini-3.5-flash"
-    assert config.max_tokens == 32000
+    assert config.model == "llama-3.3-70b-versatile"
+    assert config.max_tokens == 4096
     assert config.recency_hours == 24
     assert config.seen_file == "data/seen.json"
     assert config.ai_roles == []

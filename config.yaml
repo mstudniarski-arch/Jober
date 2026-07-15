@@ -22,8 +22,8 @@ ai_roles:
   - Junior Data Scientist
   - Junior Data Analyst
 
-model: gemini-3.5-flash
-max_tokens: 32000
+model: llama-3.3-70b-versatile
+max_tokens: 4096
 
 # Oferty starsze niż tyle godzin są pomijane (świeżość!)
 recency_hours: 24

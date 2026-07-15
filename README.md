@@ -11,9 +11,10 @@ Pod sekcją QA raport zawiera też sekcję **AI Jobs** — role juniorskie/entry
 (Junior AI Engineer, AI Engineer, Junior Data Scientist/Analyst) z twardym
 odrzucaniem ofert „Senior".
 
-Wyszukiwanie wykonuje model **Gemini 3.5 Flash** przez **grounding w Google
-Search** (wbudowany w Gemini API) — nie potrzebujesz żadnego dodatkowego API do
-szukania ani scrapera. Wystarczy klucz `GEMINI_API_KEY`.
+Wyszukiwanie robi **DuckDuckGo** (bez klucza), a analizę i ekstrakcję ofert
+**darmowy model na Groq** (`llama-3.3-70b-versatile`, plan „forever free" bez
+karty) — potrzebny tylko darmowy klucz `GROQ_API_KEY` z
+[console.groq.com/keys](https://console.groq.com/keys).
 
 ---
 
@@ -24,7 +25,8 @@ szukania ani scrapera. Wystarczy klucz `GEMINI_API_KEY`.
   (role, limit) │
                 ▼
         ┌───────────────────────────────────────────────┐
-        │  Gemini 3.5 Flash  +  Google Search grounding   │
+        │  DuckDuckGo (wyniki ≤ 24 h)  →  Groq LLM        │
+        │  (ekstrakcja)                                   │
         │  Szuka wg strategii ukrytego rynku pracy:       │
         │   • posty hiring managerów na LinkedIn          │
         │   • strony karier firm (poza agregatorami)      │
@@ -52,11 +54,13 @@ szukania ani scrapera. Wystarczy klucz `GEMINI_API_KEY`.
 Jeden przebieg = dwa wywołania API: skan QA/SDET i skan AI Jobs (przy pustej liście `ai_roles` — jedno). Skrypt:
 
 1. czyta `config.yaml` (lista ról) i `data/seen.json` (historia),
-2. każe modelowi wyszukać zdalne oferty opublikowane w ciągu ostatnich **24 godzin**
-   dla podanych ról — bez ofert wyłącznie dla kandydatów z USA; oferty z Chin są
-   uwzględniane, gdy ogłoszenie jest po angielsku (drugi, osobny skan robi to samo
-   dla ról AI z config.yaml → sekcja AI Jobs; oferty z «Senior» w tytule odpadają),
-3. odbiera listę znalezisk w formacie JSON,
+2. wykonuje zapytania DuckDuckGo — po jednym na rolę (filtr wyników z ostatnich
+   24 h + filtr reklam); drugi, osobny skan robi to samo dla ról AI z config.yaml
+   → sekcja AI Jobs (oferty z «Senior» w tytule odpadają),
+3. darmowy LLM na Groq wyciąga oferty WYŁĄCZNIE z wyników wyszukiwania (URL
+   kopiowany verbatim, bez zgadywania) — bez ofert wyłącznie dla kandydatów z USA;
+   oferty z Chin są uwzględniane, gdy ogłoszenie jest po angielsku — i zwraca
+   listę znalezisk w formacie JSON,
 4. wyrzuca duplikaty względem poprzednich dni,
 5. sprawdza każdy link HTTP-em i odrzuca oferty martwe lub wygasłe (404/410,
    nieosiągalne domeny, strony z komunikatem «no longer accepting applications»;
@@ -120,14 +124,15 @@ hidden-job-scout/
 ├── config.yaml                 # role, model — tu edytujesz
 ├── scout/
 │   ├── main.py                 # entrypoint: orkiestracja przebiegu
-│   ├── agent.py                # wywołanie Gemini 3.5 Flash + Google Search grounding
+│   ├── search.py               # zapytania DuckDuckGo (ddgs) — bez klucza
+│   ├── agent.py                # ekstrakcja ofert z wyników przez LLM na Groq
 │   ├── parsing.py              # wyciąganie znalezisk z JSON
 │   ├── dedup.py                # deduplikacja (data/seen.json)
 │   ├── report.py               # render raportu Markdown
 │   └── config.py               # wczytanie config.yaml
 ├── data/seen.json              # historia (żeby oferty się nie powtarzały)
 ├── reports/                    # tu lądują dzienne raporty .md
-├── tests/                      # 41 testów (bez wywołań prawdziwego API)
+├── tests/                      # 45 testów (bez wywołań prawdziwego API)
 ├── .github/workflows/daily-scan.yml   # cron w chmurze
 └── scripts/                    # uruchamianie lokalne (launchd + run.sh)
 ```
@@ -144,10 +149,10 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
 # 2. Testy jednostkowe — nie kosztują nic, nie ruszają sieci
-.venv/bin/pytest            # → 41 passed
+.venv/bin/pytest            # → 45 passed
 
 # 3. Prawdziwy przebieg (potrzebuje klucza API)
-echo 'GEMINI_API_KEY=...' > .env
+echo 'GROQ_API_KEY=...' > .env
 bash scripts/run.sh         # zapisze reports/<dzisiejsza-data>.md i zrobi commit
 ```
 
@@ -170,10 +175,12 @@ Wszystko w [`config.yaml`](config.yaml) — bez zmian w kodzie:
 | `roles` | Lista wyszukiwanych ról — dopisz/zmień dowolną | SDET, QA, tester, …, AI tester, AI test engineer, AI SDET |
 | `ai_roles` | Role sekcji „AI Jobs" (junior/entry; pusta lista wyłącza sekcję) | Junior AI Engineer, Junior AI, AI Engineer, Junior Data Scientist, Junior Data Analyst |
 | `recency_hours` | Pomija oferty starsze niż tyle godzin | `24` |
-| `model` | Model Gemini | `gemini-3.5-flash` |
+| `model` | Model na Groq | `llama-3.3-70b-versatile` |
 
-**Klucz API:** zmienna środowiskowa `GEMINI_API_KEY` — lokalnie w pliku `.env`
-(w `.gitignore`, nie trafia do repo), w GitHub Actions jako sekret repozytorium.
+**Klucz API:** zmienna środowiskowa `GROQ_API_KEY` — darmowy klucz z
+[console.groq.com/keys](https://console.groq.com/keys) (darmowe konto, bez karty).
+Lokalnie w pliku `.env` (w `.gitignore`, nie trafia do repo), w GitHub Actions
+jako sekret repozytorium.
 
 ---
 
@@ -182,7 +189,7 @@ Wszystko w [`config.yaml`](config.yaml) — bez zmian w kodzie:
 **GitHub Actions** (zalecane — działa niezależnie od tego, czy Mac jest włączony):
 
 1. Wypchnij repo na GitHub (prywatne).
-2. Settings → Secrets and variables → Actions → dodaj sekret `GEMINI_API_KEY`.
+2. Settings → Secrets and variables → Actions → dodaj sekret `GROQ_API_KEY`.
 3. Workflow [`daily-scan.yml`](.github/workflows/daily-scan.yml) odpala się codziennie
    o 07:00 UTC, robi skan i commituje raport do repo. Można też odpalić ręcznie
    z zakładki *Actions* (przycisk *Run workflow*).
@@ -198,15 +205,9 @@ launchctl load ~/Library/LaunchAgents/com.mski.hidden-job-scout.plist
 
 ## Koszt
 
-Tokeny modeli klasy Flash są tanie, a przy jednym przebiegu dziennie koszt jest
-bliski zeru. Aktualny cennik: https://ai.google.dev/gemini-api/docs/pricing
-
-> **Ważne — grounding wymaga billingu.** Wyszukiwanie Google (grounding) działa
-> tylko z kluczem z projektu z **włączonym billingiem** (poziom płatny Gemini
-> API). Na darmowym poziomie każde wywołanie z groundingiem kończy się błędem
-> `429 RESOURCE_EXHAUSTED` — sam model odpowiada, ale nie może szukać w sieci.
-> Billing włączysz w [Google AI Studio](https://aistudio.google.com/) (sekcja
-> API keys / Billing) lub w konsoli Google Cloud dla projektu klucza.
+Całość jest **darmowa**: DuckDuckGo nie wymaga klucza, a Groq free tier daje
+ok. 1000 zapytań do modelu dziennie — my robimy 2 (skan QA + skan AI Jobs).
+Bez karty, bez billingu.
 
 ---
 
@@ -216,7 +217,6 @@ bliski zeru. Aktualny cennik: https://ai.google.dev/gemini-api/docs/pricing
 .venv/bin/pytest
 ```
 
-41 testów jednostkowych (parsowanie JSON, deduplikacja, weryfikacja linków,
-render raportu, ponowienia przy 503/429, ścieżka błędu), żaden nie wywołuje
-prawdziwego API — bezpieczne do
-uruchamiania w kółko.
+45 testów jednostkowych (wyszukiwanie DDG, parsowanie JSON, deduplikacja,
+weryfikacja linków, render raportu, ponowienia przy 503/429, ścieżka błędu),
+żaden nie wywołuje prawdziwego API — bezpieczne do uruchamiania w kółko.

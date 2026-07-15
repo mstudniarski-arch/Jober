@@ -20,7 +20,7 @@ jobs:
       - name: Run scan
         run: python -m scout.main
         env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       - name: Commit report
         run: |
           git config user.name "hidden-job-scout"
