@@ -49,7 +49,7 @@ szukania ani scrapera. Wystarczy klucz `GEMINI_API_KEY`.
         reports/RRRR-MM-DD.md   ← gotowy raport Markdown
 ```
 
-Jeden przebieg = jedno wywołanie API. Skrypt:
+Jeden przebieg = dwa wywołania API: skan QA/SDET i skan AI Jobs (przy pustej liście `ai_roles` — jedno). Skrypt:
 
 1. czyta `config.yaml` (lista ról) i `data/seen.json` (historia),
 2. każe modelowi wyszukać zdalne oferty opublikowane w ciągu ostatnich **24 godzin**
