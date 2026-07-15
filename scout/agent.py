@@ -34,6 +34,7 @@ Newest offers matter most.
 opened via search — copy it verbatim, never construct or guess URLs. Prefer the specific
 posting URL (with a job ID or slug) over a generic careers page. Skip offers whose page says
 they are closed, expired, or no longer accepting applications.
+{seniority}
 - For each finding, set "published_at" to the publication time in ISO 8601 UTC
 (e.g. "2026-07-14T09:00:00Z"); estimate it from "posted X hours ago" when needed;
 null only if truly unknown.
@@ -68,9 +69,20 @@ class ScanResult:
     web_searches: int
 
 
-def build_prompt(config: ScoutConfig) -> str:
-    roles = "\n".join(f"- {role}" for role in config.roles)
-    return _PROMPT.format(roles=roles, recency_hours=config.recency_hours)
+_SENIORITY_FILTER = (
+    '- SENIORITY: junior/entry to mid level ONLY — skip any posting whose title contains '
+    '"Senior", "Staff", "Principal", or "Lead".'
+)
+
+
+def build_prompt(config: ScoutConfig, roles=None, junior_only=False) -> str:
+    role_list = config.roles if roles is None else roles
+    roles_text = "\n".join(f"- {role}" for role in role_list)
+    return _PROMPT.format(
+        roles=roles_text,
+        recency_hours=config.recency_hours,
+        seniority=_SENIORITY_FILTER if junior_only else "",
+    )
 
 
 def _count_search_queries(response) -> int:
@@ -82,10 +94,10 @@ def _count_search_queries(response) -> int:
     return len(queries or [])
 
 
-def run_scan(client, config: ScoutConfig) -> ScanResult:
+def run_scan(client, config: ScoutConfig, roles=None, junior_only=False) -> ScanResult:
     response = client.models.generate_content(
         model=config.model,
-        contents=build_prompt(config),
+        contents=build_prompt(config, roles=roles, junior_only=junior_only),
         config=types.GenerateContentConfig(
             tools=[types.Tool(google_search=types.GoogleSearch())],
             max_output_tokens=config.max_tokens,

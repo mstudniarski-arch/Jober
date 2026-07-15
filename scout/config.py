@@ -1,5 +1,5 @@
 """Wczytywanie konfiguracji z config.yaml."""
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 import yaml
@@ -8,6 +8,7 @@ import yaml
 @dataclass
 class ScoutConfig:
     roles: list
+    ai_roles: list = field(default_factory=list)
     model: str = "gemini-3.5-flash"
     max_tokens: int = 32000
     recency_hours: int = 24

@@ -52,3 +52,14 @@ def test_missing_optional_fields_render_as_dash():
 def test_empty_findings():
     out = render_report([], D, web_searches=20, duplicates=5)
     assert "Brak nowych znalezisk" in out
+
+
+def test_ai_jobs_section_renders_below_qa():
+    qa = Finding(company="QAco", role="SDET", apply_url="https://q.io/1",
+                 published_at="2026-07-12T08:00:00Z")
+    ai = Finding(company="AIco", role="Junior AI Engineer", apply_url="https://a.io/1",
+                 published_at="2026-07-12T09:00:00Z", section="ai")
+    out = render_report([qa, ai], D, web_searches=2, duplicates=0)
+    assert "## AI Jobs" in out
+    assert out.index("QAco — SDET") < out.index("## AI Jobs") < out.index("AIco — Junior AI Engineer")
+    assert "Nowe znaleziska: 2" in out

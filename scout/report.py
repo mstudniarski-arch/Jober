@@ -34,18 +34,25 @@ def _format_published(value):
     return value or "—"
 
 
-def render_report(findings: list, report_date: date, web_searches: int, duplicates: int, dead_links: int = 0) -> str:
+def _sorted_by_freshness(findings: list) -> list:
+    return sorted(findings, key=lambda f: _parse_published(f.published_at) or _EPOCH, reverse=True)
+
+
+def render_report(findings: list, report_date: date, web_searches: int, duplicates: int,
+                  dead_links: int = 0) -> str:
+    qa = [f for f in findings if getattr(f, "section", "qa") != "ai"]
+    ai = [f for f in findings if getattr(f, "section", "qa") == "ai"]
     lines = [f"# Hidden Job Scout — raport {report_date.isoformat()}", ""]
     if not findings:
         lines += ["Brak nowych znalezisk w tym przebiegu.", ""]
-    else:
+    if qa:
         lines += ["Najświeższe zdalne oferty z całego świata, posortowane od najnowszych.", ""]
-        ordered = sorted(
-            findings,
-            key=lambda f: _parse_published(f.published_at) or _EPOCH,
-            reverse=True,
-        )
-        for finding in ordered:
+        for finding in _sorted_by_freshness(qa):
+            lines += _render_finding(finding)
+    if ai:
+        lines += ["## AI Jobs", "",
+                  "Role AI dla poziomów junior/entry (oferty z „Senior” odrzucone), od najnowszych.", ""]
+        for finding in _sorted_by_freshness(ai):
             lines += _render_finding(finding)
     lines += ["---", f"*Wyszukiwań web: {web_searches} · Nowe znaleziska: {len(findings)} · "
               f"Odfiltrowane duplikaty: {duplicates} · Martwe linki: {dead_links}*", ""]

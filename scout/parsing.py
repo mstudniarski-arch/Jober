@@ -19,6 +19,7 @@ class Finding:
     source_url: str | None = None
     location: str | None = None
     published_at: str | None = None
+    section: str = "qa"
 
 
 _JSON_BLOCK = re.compile(r"```json\s*(.*?)```", re.DOTALL)

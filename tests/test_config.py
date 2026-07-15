@@ -19,6 +19,7 @@ def test_load_config_reads_roles_and_defaults(tmp_path):
     assert config.max_tokens == 32000
     assert config.recency_hours == 24
     assert config.seen_file == "data/seen.json"
+    assert config.ai_roles == []
 
 
 def test_load_config_overrides_defaults(tmp_path):
@@ -46,3 +47,11 @@ def test_repo_config_yaml_is_valid():
     assert "AI SDET" in config.roles
     assert "AI tester" in config.roles
     assert "AI test engineer" in config.roles
+    assert "AI Engineer" in config.ai_roles
+    assert "Junior AI Engineer" in config.ai_roles
+
+
+def test_ai_roles_loaded_from_yaml(tmp_path):
+    p = write_config(tmp_path, "roles: [QA]\nai_roles:\n  - AI Engineer\n  - Junior AI\n")
+    config = load_config(p)
+    assert config.ai_roles == ["AI Engineer", "Junior AI"]

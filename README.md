@@ -7,6 +7,9 @@ QA / SDET / tester — w tym **AI tester, AI test engineer, AI SDET**.
 Do raportu trafiają tylko oferty opublikowane w ciągu ostatnich **24 godzin**,
 bez ofert wyłącznie dla kandydatów z USA (oferty z Chin są uwzględniane, gdy
 ogłoszenie jest po angielsku), posortowane **od najnowszych**.
+Pod sekcją QA raport zawiera też sekcję **AI Jobs** — role juniorskie/entry AI
+(Junior AI Engineer, AI Engineer, Junior Data Scientist/Analyst) z twardym
+odrzucaniem ofert „Senior".
 
 Wyszukiwanie wykonuje model **Gemini 3.5 Flash** przez **grounding w Google
 Search** (wbudowany w Gemini API) — nie potrzebujesz żadnego dodatkowego API do
@@ -51,7 +54,8 @@ Jeden przebieg = jedno wywołanie API. Skrypt:
 1. czyta `config.yaml` (lista ról) i `data/seen.json` (historia),
 2. każe modelowi wyszukać zdalne oferty opublikowane w ciągu ostatnich **24 godzin**
    dla podanych ról — bez ofert wyłącznie dla kandydatów z USA; oferty z Chin są
-   uwzględniane, gdy ogłoszenie jest po angielsku,
+   uwzględniane, gdy ogłoszenie jest po angielsku (drugi, osobny skan robi to samo
+   dla ról AI z config.yaml → sekcja AI Jobs; oferty z «Senior» w tytule odpadają),
 3. odbiera listę znalezisk w formacie JSON,
 4. wyrzuca duplikaty względem poprzednich dni,
 5. sprawdza każdy link HTTP-em i odrzuca oferty martwe lub wygasłe (404/410,
@@ -123,7 +127,7 @@ hidden-job-scout/
 │   └── config.py               # wczytanie config.yaml
 ├── data/seen.json              # historia (żeby oferty się nie powtarzały)
 ├── reports/                    # tu lądują dzienne raporty .md
-├── tests/                      # 37 testów (bez wywołań prawdziwego API)
+├── tests/                      # 41 testów (bez wywołań prawdziwego API)
 ├── .github/workflows/daily-scan.yml   # cron w chmurze
 └── scripts/                    # uruchamianie lokalne (launchd + run.sh)
 ```
@@ -140,7 +144,7 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
 # 2. Testy jednostkowe — nie kosztują nic, nie ruszają sieci
-.venv/bin/pytest            # → 37 passed
+.venv/bin/pytest            # → 41 passed
 
 # 3. Prawdziwy przebieg (potrzebuje klucza API)
 echo 'GEMINI_API_KEY=...' > .env
@@ -164,6 +168,7 @@ Wszystko w [`config.yaml`](config.yaml) — bez zmian w kodzie:
 | Pole | Znaczenie | Domyślnie |
 |------|-----------|-----------|
 | `roles` | Lista wyszukiwanych ról — dopisz/zmień dowolną | SDET, QA, tester, …, AI tester, AI test engineer, AI SDET |
+| `ai_roles` | Role sekcji „AI Jobs" (junior/entry; pusta lista wyłącza sekcję) | Junior AI Engineer, Junior AI, AI Engineer, Junior Data Scientist, Junior Data Analyst |
 | `recency_hours` | Pomija oferty starsze niż tyle godzin | `24` |
 | `model` | Model Gemini | `gemini-3.5-flash` |
 
@@ -211,7 +216,7 @@ bliski zeru. Aktualny cennik: https://ai.google.dev/gemini-api/docs/pricing
 .venv/bin/pytest
 ```
 
-37 testów jednostkowych (parsowanie JSON, deduplikacja, weryfikacja linków,
+41 testów jednostkowych (parsowanie JSON, deduplikacja, weryfikacja linków,
 render raportu, ponowienia przy 503/429, ścieżka błędu), żaden nie wywołuje
 prawdziwego API — bezpieczne do
 uruchamiania w kółko.

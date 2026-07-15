@@ -13,6 +13,15 @@ roles:
   - AI test engineer
   - AI SDET
 
+# Sekcja "AI Jobs" — role juniorskie/entry AI. Oferty z "Senior" w tytule odpadają.
+# Pusta lista wyłącza sekcję.
+ai_roles:
+  - Junior AI Engineer
+  - Junior AI
+  - AI Engineer
+  - Junior Data Scientist
+  - Junior Data Analyst
+
 model: gemini-3.5-flash
 max_tokens: 32000
 

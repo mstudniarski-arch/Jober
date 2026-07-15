@@ -17,6 +17,16 @@ def test_build_prompt_contains_roles_scope_and_format():
     assert "published_at" in prompt
     assert "US only" in prompt
     assert "verbatim" in prompt
+    assert "SENIORITY" not in prompt
+
+
+def test_junior_only_prompt_lists_ai_roles_and_seniority_filter():
+    prompt = build_prompt(CONFIG, roles=["Junior AI Engineer", "AI Engineer"], junior_only=True)
+    assert "- Junior AI Engineer" in prompt
+    assert "- AI Engineer" in prompt
+    assert "- AI SDET" not in prompt  # role QA nie przeciekają do sekcji AI
+    assert "SENIORITY" in prompt
+    assert '"Senior"' in prompt
 
 
 def test_run_scan_returns_text_and_search_count():

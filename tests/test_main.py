@@ -21,6 +21,19 @@ ANSWER = """Research done.
 ]}
 ```"""
 
+AI_ANSWER = """Research done.
+
+```json
+{"findings": [
+  {"company": "NeuralWorks", "role": "Junior AI Engineer",
+   "apply_url": "https://neural.works/jobs/7", "signal_type": "job_posting",
+   "location": "Remote (worldwide)"},
+  {"company": "BigCorp", "role": "Senior AI Engineer",
+   "apply_url": "https://bigcorp.io/jobs/9", "signal_type": "job_posting",
+   "location": "Remote (worldwide)"}
+]}
+```"""
+
 
 def no_verify(findings):
     return list(findings), []
@@ -142,4 +155,34 @@ def test_dead_links_are_dropped_counted_and_remembered(tmp_path):
     assert "Martwe linki: 1" in report
     seen = json.loads((tmp_path / "data" / "seen.json").read_text(encoding="utf-8"))
     assert seen["seen"] == ["acme.com/jobs/1"]  # martwy link też zapamiętany
+
+
+def write_config_with_ai(tmp_path: Path) -> Path:
+    cfg = tmp_path / "config.yaml"
+    cfg.write_text(
+        "roles: [SDET]\n"
+        "ai_roles: [Junior AI Engineer, AI Engineer]\n"
+        f"reports_dir: {tmp_path / 'reports'}\n"
+        f"seen_file: {tmp_path / 'data' / 'seen.json'}\n"
+        f"logs_dir: {tmp_path / 'logs'}\n",
+        encoding="utf-8",
+    )
+    return cfg
+
+
+def test_ai_section_scanned_filtered_and_rendered(tmp_path):
+    cfg = write_config_with_ai(tmp_path)
+    client = FakeClient([fake_response(ANSWER), fake_response(AI_ANSWER)])
+    assert run(cfg, client=client, report_date=D, verify=no_verify) == 0
+    assert len(client.models.calls) == 2  # osobny skan QA i osobny AI
+    assert "Junior AI Engineer" in client.models.calls[1]["contents"]
+
+    report = (tmp_path / "reports" / "2026-07-12.md").read_text(encoding="utf-8")
+    assert "## AI Jobs" in report
+    assert "NeuralWorks — Junior AI Engineer" in report
+    assert "Senior AI Engineer" not in report  # twardy filtr Senior
+    assert report.index("Acme — SDET") < report.index("## AI Jobs")
+
+    seen = json.loads((tmp_path / "data" / "seen.json").read_text(encoding="utf-8"))
+    assert "neural.works/jobs/7" in seen["seen"]
 
